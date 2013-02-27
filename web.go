@@ -43,7 +43,7 @@ var tpl = template.Must(
 		</Script>
 	</head>
 	<body>
-	<div id="main" style="width: 960px; margin: auto">
+	<div id="main" style="margin: auto">
 	<h1>Pingo</h1>
 	<table id="data">
 		<thead>
