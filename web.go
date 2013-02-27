@@ -5,10 +5,16 @@ import (
 	"net/http"
 	"text/template"
 	"fmt"
+	"time"
 )
 
+func Now() string {
+	return time.Now().Format("02/01/2006 15:04:05")
+}
+
 // Init of the Web Page template.
-var tpl = template.Must(template.New("main").Parse(`
+var tpl = template.Must(
+	template.New("main").Funcs(template.FuncMap{ "Now": Now }).Parse(`
 	<html>
 	<head>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.0.0/moment.min.js"></script>
@@ -58,10 +64,12 @@ var tpl = template.Must(template.New("main").Parse(`
 			<td><span class="time">{{.LastCheck.Unix}}</span></td>
 		</tr>
 	{{end}}
-	</ul>
+	</table>
+	<p><small>generated on {{Now}}</small></p>
+	</div>
 	</body>
 	</html>`))
-
+	
 func startHttp(port int, state *State) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request){
 		state.Lock.Lock()
