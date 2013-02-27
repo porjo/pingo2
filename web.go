@@ -7,16 +7,21 @@ import (
 	"fmt"
 )
 
+// Init of the Web Page template.
 var tpl = template.Must(template.New("main").Parse(`
 	<html>
 	<head>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.0.0/moment.min.js"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 		<style>
+			body{padding: 40px; color: #33333A; font-family: Arial }
 			table{ border-collapse: collapse}
-			td, th {border: 1px solid #999; padding: 4px 5px}
+			td, th { font-weight: normal; padding: 6px}
+			th{ background-color: #90909D; color: #FFF; border-bottom: 1px solid #445}
+			td{ border-bottom: 1px solid #999;}
 			.online{ background-color: #3E3; color: #FFF; padding: 3px 5px; border-radius: 5px}
 			.offline{ background-color: #E33; color: #FFF; padding: 3px 5px; border-radius: 5px}
+			.time{ font-size: 0.8em }
 		</style>	
 		<script>
 		$(function(){
@@ -32,14 +37,16 @@ var tpl = template.Must(template.New("main").Parse(`
 		</Script>
 	</head>
 	<body>
+	<div id="main" style="width: 960px; margin: auto">
+	<h1>Pingo</h1>
 	<table id="data">
 		<thead>
 			<tr><th>Target</th><th>Address</th><th>Status</th><th>Last Change</th><th>Last Check</th></tr>
 		</thead>
 	{{range .State}}
 		<tr>
-			<td>{{.Target.Name}}</td>
-			<td>{{.Target.Addr}}</td>
+			<td><strong>{{.Target.Name}}</strong></td>
+			<td><i>{{.Target.Addr}}</i></td>
 			<td>
 				{{if .Online }}
 					<span class="online">ONLINE</span>
