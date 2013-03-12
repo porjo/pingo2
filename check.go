@@ -1,12 +1,12 @@
 package main
 
 import (
-	"time"
 	"log"
 	"net"
+	"time"
 )
 
-type Target struct{
+type Target struct {
 	// Name of the Target
 	Name string
 	// Address (ex: "localhost:80" of the target
@@ -15,10 +15,10 @@ type Target struct{
 	Interval int64
 }
 
-type TargetStatus struct{
-	Target *Target
-	Online bool
-	Since time.Time
+type TargetStatus struct {
+	Target    *Target
+	Online    bool
+	Since     time.Time
 	LastCheck time.Time
 }
 
@@ -26,32 +26,32 @@ func startTarget(t Target, res chan TargetStatus, end chan int) {
 	go runTarget(t, res, end)
 }
 
-func runTarget(t Target, res chan TargetStatus, end chan int){
+func runTarget(t Target, res chan TargetStatus, end chan int) {
 
-	log.Println("starting runtarget on ",t.Name)
-	if t.Interval== 0{
-		t.Interval=1
+	log.Println("starting runtarget on ", t.Name)
+	if t.Interval == 0 {
+		t.Interval = 1
 	}
 	ticker := time.Tick(time.Duration(t.Interval) * time.Second)
 	for {
 		// Polling
-	
+
 		var status TargetStatus
 		conn, err := net.Dial("tcp", t.Addr)
-		
-		if err!=nil {
+
+		if err != nil {
 			// Connect ok
-			status = TargetStatus{ Target: &t, Online: false, Since: time.Now() }
-		}else{			
+			status = TargetStatus{Target: &t, Online: false, Since: time.Now()}
+		} else {
 			// Error during connect
-			status = TargetStatus{ Target: &t, Online: true, Since: time.Now() }
+			status = TargetStatus{Target: &t, Online: true, Since: time.Now()}
 			conn.Close()
 		}
-		
+
 		res <- status
-		
+
 		// waiting to ticker
-		<- ticker
+		<-ticker
 	}
 	end <- 1
 }
