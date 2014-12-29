@@ -7,14 +7,34 @@ import (
 )
 
 type Config struct {
+	// Network timeout in seconds
+	Timeout int
+	// SMTP relay config
+	SMTP SMTPConfig
+	// Alert properties
+	Alert   Alert
 	Targets []Target
+}
+
+type Alert struct {
+	// On alert, send to this email address
+	ToEmail string
+	// On alert, send from this email address
+	FromEmail string
+	// Trigger an alert every x seconds when in failed state
+	Interval int
+}
+
+type SMTPConfig struct {
+	Hostname string
+	Port     int
 }
 
 // Opening (or creating) config file in JSON format
 func readConfig(filename string) Config {
-
 	config := Config{
-		Targets: []Target{Target{Name: "Local HTTP Server", Addr: "localhost:80"}},
+		Timeout: 10,
+		Targets: []Target{Target{Name: "Local HTTP Server", Addr: "http://localhost"}},
 	}
 
 	file, err := os.Open(filename)
@@ -26,7 +46,7 @@ func readConfig(filename string) Config {
 			log.Fatal(err)
 		}
 
-		// config file just created		
+		// config file just created
 		err := json.NewEncoder(file).Encode(config)
 		if err != nil {
 			log.Fatal(err)

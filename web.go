@@ -6,23 +6,14 @@ import (
 	"log"
 	"net/http"
 	"text/template"
-	"time"
 )
-
-func Now() string {
-	return time.Now().Format("02/01/2006 15:04:05")
-}
 
 // Init of the Web Page template.
 var tpl = template.Must(
-	template.New("main").Delims("<%", "%>").Funcs(template.FuncMap{"Now": Now, "json": json.Marshal}).Parse(`
-	<html>
+	template.New("main").Delims("<%", "%>").Funcs(template.FuncMap{"json": json.Marshal}).Parse(`
+	<!DOCTYPE html>
+	<html ng-app="app">
 	<head>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.0.0/moment.min.js"></script>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0-rc.3/handlebars.min.js"></script>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.1/angular.min.js"></script>
 		<style>
 			body{padding: 40px; color: #33333A; font-family: Arial }
 			table{ border-collapse: collapse}
@@ -34,25 +25,17 @@ var tpl = template.Must(
 			.time{ font-size: 0.8em }
 		</style>
 	
-		<script>
-		function targetController($scope){
-			$scope.targets = [];
-			<%range .State%>
-			$scope.targets.push(<% json . | printf "%s"  %>);
-			<%end%>
-		}
-		</script>
 		
 	</head>
-	<body ng-app>
+	<body>
 		<div id="main" style="margin: auto">
 			<h1>Pingo</h1>
-			<div id="targets" ng-controller="targetController">
+			<div id="targets" ng-controller="TargetController">
 				<p>Total number of targets : <strong>{{targets.length}}</strong></p>
 				Search: <input ng-model="q"/>
 				<table>
 					<tr>
-						<th ng-switch on="by='Target.Name' & asc">
+						<th ng-switch="'Target.Name' && asc">
 							<a href ng-click="by = 'Target.Name'; asc=!asc">Name</a>
 							<span ng-switch-when="true">up</span>
 							<span ng-switch-default="false">up</span>
@@ -61,6 +44,7 @@ var tpl = template.Must(
 						<th><a ng-click="by='Online';asc=!asc">Online</a></th>
 						<th><a ng-click="by='Since';asc=!asc">Since</a></th>
 						<th><a ng-click="by='lastCheck';asc=!asc">Last Update</a></th>
+						<th>Message</th>
 					</tr>
 					<tr ng-repeat="t in targets | filter:q |orderBy:by:asc">
 						<td>{{t.Target.Name}}</td>
@@ -69,12 +53,49 @@ var tpl = template.Must(
 							<span ng-switch-when="true" class="online">online</span>
 							<span ng-switch-when="false" class="offline">offline</span>
 						</td>
-						<td>{{t.Since}}</td>
-						<td>{{t.LastCheck}}</td>
+						<td>{{t.Since | dateFormat}} ({{t.Since | dateFromNow}})</td>
+						<td>{{t.LastCheck | dateFormat}} ({{t.Since | dateFromNow}})</td>
+						<td>{{t.ErrorMsg}}</td>
 					</tr>
-				</ul>
+				</table>
 			</div>
 		</div>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.3.8/angular.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.4/moment.min.js"></script>
+		<script>
+		var app = angular.module('app',[]);
+		app.controller('TargetController', function($scope){
+			$scope.targets = [];
+			<%range .State%>
+			$scope.targets.push(<% json . | printf "%s"  %>);
+			<%end%>
+		});
+
+		app.filter('dateFormat', function() {
+				return function(input,format,offset) {
+					var date = moment(new Date(input));
+					if( angular.isDefined(format) ){
+						dateStr = date.format(format);
+					} else {
+						dateStr = date.format('YYYY-MM-DD');
+					}
+					return dateStr;
+				}
+			});
+		// Wrapper around Moment.js fromNow()
+		app.filter('dateFromNow', function() {
+			return function(input, noSuffix) {
+				if( angular.isDefined(input) ) {
+					if( noSuffix ) {
+						return moment(input).fromNow(true);
+					} else {
+						return moment(input).fromNow();
+					}
+				}
+			};
+		});
+		</script>
 	</body>
 	</html>
 	`))
