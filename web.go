@@ -81,8 +81,8 @@ var tpl = template.Must(
 
 func startHttp(port int, state *State) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		state.Lock.Lock()
-		defer state.Lock.Unlock()
+		state.Lock()
+		defer state.Unlock()
 
 		err := tpl.Execute(w, state)
 		if err != nil {

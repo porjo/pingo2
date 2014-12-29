@@ -5,7 +5,7 @@ import (
 )
 
 type State struct {
-	Lock  sync.Mutex
+	sync.Mutex
 	State map[*Target]TargetStatus
 }
 

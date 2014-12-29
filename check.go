@@ -12,7 +12,7 @@ type Target struct {
 	// Address (ex: "localhost:80" of the target
 	Addr string
 	// Polling interval, in seconds
-	Interval int64
+	Interval int
 }
 
 type TargetStatus struct {
@@ -22,11 +22,11 @@ type TargetStatus struct {
 	LastCheck time.Time
 }
 
-func startTarget(t Target, res chan TargetStatus, end chan int) {
-	go runTarget(t, res, end)
+func startTarget(t Target, res chan TargetStatus) {
+	go runTarget(t, res)
 }
 
-func runTarget(t Target, res chan TargetStatus, end chan int) {
+func runTarget(t Target, res chan TargetStatus) {
 
 	log.Println("starting runtarget on ", t.Name)
 	if t.Interval == 0 {
@@ -34,24 +34,29 @@ func runTarget(t Target, res chan TargetStatus, end chan int) {
 	}
 	ticker := time.Tick(time.Duration(t.Interval) * time.Second)
 	for {
+		status := TargetStatus{Target: &t}
 		// Polling
-
-		var status TargetStatus
 		conn, err := net.Dial("tcp", t.Addr)
 
 		if err != nil {
-			// Connect ok
-			status = TargetStatus{Target: &t, Online: false, Since: time.Now()}
-		} else {
+			if status.Online {
+				status.Since = time.Now()
+			}
 			// Error during connect
-			status = TargetStatus{Target: &t, Online: true, Since: time.Now()}
+			status.Online = false
+		} else {
+			if !status.Online {
+				status.Since = time.Now()
+			}
+			// Connect ok
+			status.Online = true
 			conn.Close()
 		}
+		status.LastCheck = time.Now()
 
 		res <- status
 
-		// waiting to ticker
+		// waiting for ticker
 		<-ticker
 	}
-	end <- 1
 }
