@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 
-	"github.com/BurntSushi/toml"
+	//"github.com/BurntSushi/toml"
 )
 
 type Config struct {
@@ -48,13 +49,15 @@ func readConfig(filename string) Config {
 		}
 
 		// config file just created
-		err := toml.NewEncoder(file).Encode(config)
+		//err := toml.NewEncoder(file).Encode(config)
+		err := json.NewEncoder(file).Encode(config)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	} else {
-		_, err := toml.DecodeReader(file, &config)
+		//_, err := toml.DecodeReader(file, &config)
+		err = json.NewDecoder(file).Decode(&config)
 
 		if err != nil {
 			log.Fatal(err)
