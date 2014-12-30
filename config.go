@@ -1,9 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"os"
+
+	"github.com/BurntSushi/toml"
 )
 
 type Config struct {
@@ -30,7 +31,7 @@ type SMTPConfig struct {
 	Port     int
 }
 
-// Opening (or creating) config file in JSON format
+// Opening (or creating) config file in TOML format
 func readConfig(filename string) Config {
 	config := Config{
 		Timeout: 10,
@@ -47,14 +48,13 @@ func readConfig(filename string) Config {
 		}
 
 		// config file just created
-		err := json.NewEncoder(file).Encode(config)
+		err := toml.NewEncoder(file).Encode(config)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	} else {
-
-		err = json.NewDecoder(file).Decode(&config)
+		_, err := toml.DecodeReader(file, &config)
 
 		if err != nil {
 			log.Fatal(err)

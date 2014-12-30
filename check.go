@@ -98,6 +98,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 					if t.Keyword != "" {
 						if strings.Index(string(body), t.Keyword) == -1 {
 							status.ErrorMsg = fmt.Sprintf("keyword '%s' not found", t.Keyword)
+							log.Printf("%s, %s\n", t.Name, status.ErrorMsg)
 							failed = true
 						}
 					}
