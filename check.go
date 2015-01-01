@@ -93,7 +93,6 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 					status.ErrorMsg = fmt.Sprintf("%s", err)
 					failed = true
 				} else {
-					resp.Body.Close()
 
 					if t.Keyword != "" {
 						if strings.Index(string(body), t.Keyword) == -1 {
@@ -103,6 +102,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 						}
 					}
 				}
+				resp.Body.Close()
 			}
 		} else {
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
@@ -110,9 +110,8 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 				log.Printf("Error %s\n", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
-			} else {
-				conn.Close()
 			}
+			conn.Close()
 		}
 
 		if failed {
