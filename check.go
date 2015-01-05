@@ -67,18 +67,21 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			var client *http.Client
 
 			req, _ := http.NewRequest("GET", addrURL.String(), nil)
+			transport := &http.Transport{
+				DisableKeepAlives:  true,
+				DisableCompression: true,
+			}
 			if t.Host != "" {
 				// Set hostname for TLS connection. This allows us to connect to use
 				// another hostname or IP for the actual TCP connection. Handy for GeoDNS scenarios.
-				transport := http.Transport{
-					TLSClientConfig: &tls.Config{
-						ServerName: t.Host,
-					},
+				transport.TLSClientConfig = &tls.Config{
+					ServerName: t.Host,
 				}
 				req.Host = t.Host
-				client = &http.Client{Transport: &transport}
-			} else {
-				client = &http.Client{}
+			}
+			client = &http.Client{
+				Timeout:   time.Duration(config.Timeout) * time.Second,
+				Transport: transport,
 			}
 			resp, err = client.Do(req)
 			if err != nil {
@@ -88,13 +91,11 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			} else {
 				var body []byte
 				body, err = ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
 				if err != nil {
 					log.Printf("Error %s\n", err)
 					status.ErrorMsg = fmt.Sprintf("%s", err)
 					failed = true
 				} else {
-
 					if t.Keyword != "" {
 						if strings.Index(string(body), t.Keyword) == -1 {
 							status.ErrorMsg = fmt.Sprintf("keyword '%s' not found", t.Keyword)
@@ -103,6 +104,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 						}
 					}
 				}
+				resp.Body.Close()
 			}
 		case "ping":
 			var success bool
@@ -115,22 +117,26 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 		default:
 			var conn net.Conn
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
-			conn.Close()
 			if err != nil {
 				log.Printf("Error %s\n", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
+			} else {
+				conn.Close()
 			}
 		}
 
 		if failed {
 			// Error during connect
-			status.Online = false
-			if time.Since(status.LastAlert) > time.Second*time.Duration(config.Alert.Interval) {
-				alert(&status, config)
-			}
 			if status.Online {
 				status.Since = time.Now()
+				status.Online = false
+				alert(&status, config)
+			} else {
+				status.Online = false
+				if time.Since(status.LastAlert) > time.Second*time.Duration(config.Alert.Interval) {
+					alert(&status, config)
+				}
 			}
 		} else {
 			// Connect ok
