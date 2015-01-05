@@ -62,7 +62,8 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 		}
 
 		// Polling
-		if addrURL.Scheme == "http" || addrURL.Scheme == "https" {
+		switch addrURL.Scheme {
+		case "http", "https":
 			var resp *http.Response
 			var client *http.Client
 
@@ -104,7 +105,15 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 				}
 				resp.Body.Close()
 			}
-		} else {
+		case "ping":
+			var success bool
+			success, err = Ping(addrURL.Host)
+			if err != nil {
+				log.Printf("Error %s\n", err)
+				status.ErrorMsg = fmt.Sprintf("%s", err)
+			}
+			failed = !success
+		default:
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
 			if err != nil {
 				log.Printf("Error %s\n", err)
