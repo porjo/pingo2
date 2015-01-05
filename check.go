@@ -49,7 +49,6 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 	status := TargetStatus{Target: &t, Online: true, Since: time.Now()}
 	for {
 		var err error
-		var conn net.Conn
 		var failed bool
 		var addrURL *url.URL
 
@@ -89,6 +88,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			} else {
 				var body []byte
 				body, err = ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
 				if err != nil {
 					log.Printf("Error %s\n", err)
 					status.ErrorMsg = fmt.Sprintf("%s", err)
@@ -103,7 +103,6 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 						}
 					}
 				}
-				resp.Body.Close()
 			}
 		case "ping":
 			var success bool
@@ -114,13 +113,14 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			}
 			failed = !success
 		default:
+			var conn net.Conn
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
+			conn.Close()
 			if err != nil {
 				log.Printf("Error %s\n", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
 			}
-			conn.Close()
 		}
 
 		if failed {
