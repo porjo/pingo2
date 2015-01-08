@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// minimum interval between checks. Used as default value when none set by user.
 const CheckInterval = 30
 
 type Target struct {
@@ -72,7 +73,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 				DisableCompression: true,
 			}
 			if t.Host != "" {
-				// Set hostname for TLS connection. This allows us to connect to use
+				// Set hostname for TLS connection. This allows us to connect using
 				// another hostname or IP for the actual TCP connection. Handy for GeoDNS scenarios.
 				transport.TLSClientConfig = &tls.Config{
 					ServerName: t.Host,
