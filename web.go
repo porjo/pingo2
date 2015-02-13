@@ -112,11 +112,10 @@ func startHttp(port int, state *State) {
 	})
 
 	s := fmt.Sprintf(":%d", port)
-	log.Println("starting to listen on ", s)
-	log.Printf("Get status on http://localhost%s/status", s)
+	log.Printf("Status page available at: http://localhost%s/status", s)
 
 	err := http.ListenAndServe(s, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("HTTP server error, %s", err)
 	}
 }

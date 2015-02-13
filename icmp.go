@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"os"
 	"time"
@@ -53,7 +52,7 @@ func Ping(hostname string) (reply bool, err error) {
 		return false, err
 	}
 	if _, err := c.WriteTo(wb, &net.UDPAddr{IP: ipAddr.IP}); err != nil {
-		log.Fatalf("WriteTo err, %s", err)
+		return false, err
 	}
 
 	rb := make([]byte, 1500)

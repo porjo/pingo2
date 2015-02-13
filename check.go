@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,17 +43,22 @@ func startTarget(t Target, res chan TargetStatus, config Config) {
 }
 
 func runTarget(t Target, res chan TargetStatus, config Config) {
-	log.Println("starting runtarget on ", t.Name)
+	var err error
+	var failed bool
+	var addrURL *url.URL
+	log.Printf("starting runtarget on %s", t.Name)
 	if t.Interval < CheckInterval {
 		t.Interval = CheckInterval
 	}
-	ticker := time.Tick(time.Duration(t.Interval) * time.Second)
-	status := TargetStatus{Target: &t, Online: true, Since: time.Now()}
-	for {
-		var err error
-		var failed bool
-		var addrURL *url.URL
 
+	// wait a bit, to randomize check offset
+	time.Sleep(time.Duration(rand.Intn(t.Interval)) * time.Second)
+
+	ticker := time.Tick(time.Duration(t.Interval) * time.Second)
+	alertCancel := make(chan bool, 1)
+	status := TargetStatus{Target: &t, Online: true, Since: time.Now()}
+
+	for {
 		status.ErrorMsg = ""
 
 		addrURL, err = url.Parse(t.Addr)
@@ -86,14 +92,14 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			}
 			resp, err = client.Do(req)
 			if err != nil {
-				log.Printf("Error %s\n", err)
+				log.Printf("http[s] error, %s", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
 			} else {
 				var body []byte
 				body, err = ioutil.ReadAll(resp.Body)
 				if err != nil {
-					log.Printf("Error %s\n", err)
+					log.Printf("http[s] error, %s", err)
 					status.ErrorMsg = fmt.Sprintf("%s", err)
 					failed = true
 				} else {
@@ -111,7 +117,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			var success bool
 			success, err = Ping(addrURL.Host)
 			if err != nil {
-				log.Printf("Error %s\n", err)
+				log.Printf("ping error, %s", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 			}
 			failed = !success
@@ -119,7 +125,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			var conn net.Conn
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
 			if err != nil {
-				log.Printf("Error %s\n", err)
+				log.Printf("tcp conn error, %s", err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
 			} else {
@@ -130,28 +136,50 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 		if failed {
 			// Error during connect
 			if status.Online {
+				// was online, now offline
+				status.Online = false
 				status.Since = time.Now()
-				status.Online = false
-				alert(&status, config)
+
+				// Don't bother with 'down' alert
+				// if host comes back within a minute
+				go func(s TargetStatus) {
+					timer1 := time.NewTimer(time.Minute)
+					select {
+					case <-alertCancel:
+						return
+					case <-timer1.C:
+						alert(&s, config)
+					}
+				}(status)
 			} else {
-				status.Online = false
+				// was offline, still offline
 				if time.Since(status.LastAlert) > time.Second*time.Duration(config.Alert.Interval) {
 					alert(&status, config)
+
 				}
 			}
 		} else {
 			// Connect ok
+			alertCancel <- true
 			if !status.Online {
-				status.Since = time.Now()
+				// was offline, now online
 				status.Online = true
-				alert(&status, config)
-			} else {
-				status.Online = true
+				// Don't bother with 'up' alert if the host was down less than a minute
+				if time.Since(status.Since) < time.Duration(time.Minute) {
+					status.Since = time.Now()
+					alert(&status, config)
+				}
 			}
 		}
 		status.LastCheck = time.Now()
 
 		res <- status
+
+		// clear any pending cancels
+		select {
+		case <-alertCancel:
+		default:
+		}
 
 		// waiting for ticker
 		<-ticker
@@ -162,7 +190,7 @@ func alert(status *TargetStatus, config Config) {
 	if config.Alert.ToEmail != "" {
 		err := EmailAlert(*status, config)
 		if err != nil {
-			log.Printf("%s\n", err)
+			log.Printf("%s", err)
 		}
 		status.LastAlert = time.Now()
 	}
