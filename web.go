@@ -54,7 +54,7 @@ var tpl = template.Must(
 							<span ng-switch-when="false" class="offline">offline</span>
 						</td>
 						<td>{{t.Since | dateFormat}} ({{t.Since | dateFromNow}})</td>
-						<td>{{t.LastCheck | dateFormat}} ({{t.Since | dateFromNow}})</td>
+						<td>{{t.LastCheck | dateFormat}} ({{t.LastCheck | dateFromNow}})</td>
 						<td>{{t.ErrorMsg}}</td>
 					</tr>
 				</table>
