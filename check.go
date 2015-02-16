@@ -59,6 +59,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 	status := TargetStatus{Target: &t, Online: true, Since: time.Now()}
 
 	for {
+		failed = false
 		status.ErrorMsg = ""
 
 		addrURL, err = url.Parse(t.Addr)
