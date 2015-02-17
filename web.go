@@ -43,7 +43,7 @@ var tpl = template.Must(
 						<th><a ng-click="by='Target.Addr';asc=!asc">Addr</a></th>
 						<th><a ng-click="by='Online';asc=!asc">Online</a></th>
 						<th><a ng-click="by='Since';asc=!asc">Since</a></th>
-						<th><a ng-click="by='lastCheck';asc=!asc">Last Update</a></th>
+						<th><a ng-click="by='lastCheck';asc=!asc">Last Check</a></th>
 						<th>Message</th>
 					</tr>
 					<tr ng-repeat="t in targets | filter:q |orderBy:by:asc">
