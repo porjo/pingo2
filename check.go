@@ -17,6 +17,8 @@ import (
 const CheckInterval = 30
 
 type Target struct {
+	// target id
+	Id int
 	// Name of the Target
 	Name string
 	// Address of the target e.g. "http://localhost"
@@ -55,7 +57,9 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 	time.Sleep(time.Duration(rand.Intn(t.Interval)) * time.Second)
 
 	ticker := time.Tick(time.Duration(t.Interval) * time.Second)
-	alertCancel := make(chan bool, 1)
+	alertRequest := make(chan *TargetStatus, 1)
+	// spawn routine to handle alert requests
+	go alertRoutine(alertRequest, config)
 	status := TargetStatus{Target: &t, Online: true, Since: time.Now()}
 
 	for {
@@ -93,21 +97,21 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			}
 			resp, err = client.Do(req)
 			if err != nil {
-				log.Printf("http[s] error, %s", err)
+				log.Printf("[%d:%s] http(s) error, %s", t.Id, addrURL, err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
 			} else {
 				var body []byte
 				body, err = ioutil.ReadAll(resp.Body)
 				if err != nil {
-					log.Printf("http[s] error, %s", err)
+					log.Printf("[%d:%s] http(s) error, %s", t.Id, addrURL, err)
 					status.ErrorMsg = fmt.Sprintf("%s", err)
 					failed = true
 				} else {
 					if t.Keyword != "" {
 						if strings.Index(string(body), t.Keyword) == -1 {
 							status.ErrorMsg = fmt.Sprintf("keyword '%s' not found", t.Keyword)
-							log.Printf("%s, %s\n", t.Name, status.ErrorMsg)
+							log.Printf("[%d:%s] http(s) error, %s", t.Id, addrURL, status.ErrorMsg)
 							failed = true
 						}
 					}
@@ -118,7 +122,7 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			var success bool
 			success, err = Ping(addrURL.Host)
 			if err != nil {
-				log.Printf("ping error, %s", err)
+				log.Printf("[%d:%s] ping error, %s", t.Id, addrURL, err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 			}
 			failed = !success
@@ -126,12 +130,18 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			var conn net.Conn
 			conn, err = net.DialTimeout("tcp", addrURL.Host, time.Duration(config.Timeout)*time.Second)
 			if err != nil {
-				log.Printf("tcp conn error, %s", err)
+				log.Printf("[%d:%s] tcp conn error, %s", t.Id, addrURL, err)
 				status.ErrorMsg = fmt.Sprintf("%s", err)
 				failed = true
 			} else {
 				conn.Close()
 			}
+		}
+
+		status.LastCheck = time.Now()
+
+		if debug {
+			log.Printf("[%d:%s] failed=%v, online=%v, since=%s, last_alert=%s, last_check=%s", t.Id, addrURL, failed, status.Online, status.Since, status.LastAlert, status.LastCheck)
 		}
 
 		if failed {
@@ -140,47 +150,32 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 				// was online, now offline
 				status.Online = false
 				status.Since = time.Now()
+				alertRequest <- &status
 
-				// Don't bother with 'down' alert
-				// if host comes back within a minute
-				go func(s TargetStatus) {
-					timer1 := time.NewTimer(time.Minute)
-					select {
-					case <-alertCancel:
-						return
-					case <-timer1.C:
-						alert(&s, config)
-					}
-				}(status)
 			} else {
 				// was offline, still offline
 				if time.Since(status.LastAlert) > time.Second*time.Duration(config.Alert.Interval) {
-					alert(&status, config)
-
+					alertRequest <- &status
 				}
 			}
 		} else {
 			// Connect ok
-			alertCancel <- true
 			if !status.Online {
 				// was offline, now online
 				status.Online = true
+				lastSince := status.Since
+				status.Since = time.Now()
+				if debug {
+					log.Printf("[%d:%s] was offline, now online - time since=%s", t.Id, addrURL, time.Since(lastSince))
+				}
 				// Don't bother with 'up' alert if the host was down less than a minute
-				if time.Since(status.Since) < time.Duration(time.Minute) {
-					status.Since = time.Now()
-					alert(&status, config)
+				if time.Since(lastSince) > time.Duration(time.Minute) {
+					alertRequest <- &status
 				}
 			}
 		}
-		status.LastCheck = time.Now()
 
 		res <- status
-
-		// clear any pending cancels
-		select {
-		case <-alertCancel:
-		default:
-		}
 
 		// waiting for ticker
 		<-ticker
@@ -193,6 +188,46 @@ func alert(status *TargetStatus, config Config) {
 		if err != nil {
 			log.Printf("%s", err)
 		}
-		status.LastAlert = time.Now()
+		if debug {
+			log.Printf("[%d:%s] alert sent to %s", status.Target.Id, status.Target.Addr, config.Alert.ToEmail)
+		}
+	} else {
+		if debug {
+			log.Printf("[%d:%s] alert NOT sent as no 'To:' email specified", status.Target.Id, status.Target.Addr)
+		}
+	}
+	status.LastAlert = time.Now()
+}
+
+func alertRoutine(alertRequest <-chan *TargetStatus, config Config) {
+	for {
+		select {
+		case req := <-alertRequest:
+			if req.Online || time.Since(req.Since) > time.Duration(time.Minute) {
+				alert(req, config)
+			} else {
+				// Don't bother with 'down' alert
+				// if host comes back within a minute
+				timer1 := time.NewTimer(time.Minute)
+				for {
+					select {
+					case req2 := <-alertRequest:
+						if req2.Online {
+							alert(req2, config)
+							goto done
+						} else {
+							// if another 'offline' requests comes in the meantime
+							// ignore and continue waiting for timer or 'online'
+							continue
+						}
+					case <-timer1.C:
+						alert(req, config)
+					}
+
+				done:
+					break
+				}
+			}
+		}
 	}
 }

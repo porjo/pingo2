@@ -28,6 +28,8 @@ import (
 	"log"
 )
 
+var debug = false
+
 // Init config
 
 // Main function
@@ -35,6 +37,7 @@ func main() {
 	//filename := flag.String("f", "config.toml", "TOML configuration file")
 	filename := flag.String("f", "config.json", "JSON configuration file")
 	httpPort := flag.Int("p", 8888, "HTTP port")
+	flag.BoolVar(&debug, "d", false, "Enable debug output")
 
 	flag.Parse()
 

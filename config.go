@@ -63,5 +63,10 @@ func readConfig(filename string) Config {
 			log.Fatal(err)
 		}
 	}
+
+	// number targets
+	for i, _ := range config.Targets {
+		config.Targets[i].Id = i + 1
+	}
 	return config
 }

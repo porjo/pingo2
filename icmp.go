@@ -64,11 +64,9 @@ func Ping(hostname string) (reply bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	switch rm.Type {
-	case ipv4.ICMPTypeEchoReply:
+
+	if rm.Type == ipv4.ICMPTypeEchoReply {
 		return true, nil
-	default:
-		return false, nil
 	}
 
 	return false, nil
