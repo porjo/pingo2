@@ -203,6 +203,7 @@ func alertRoutine(alertRequest <-chan *TargetStatus, config Config) {
 	for {
 		select {
 		case req := <-alertRequest:
+			// Host is online, or has been offline for greater than a minute
 			if req.Online || time.Since(req.Since) > time.Duration(time.Minute) {
 				alert(req, config)
 			} else {
