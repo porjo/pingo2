@@ -163,15 +163,11 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 			if !status.Online {
 				// was offline, now online
 				status.Online = true
-				lastSince := status.Since
-				status.Since = time.Now()
 				if debug {
-					log.Printf("[%d:%s] was offline, now online - time since=%s", t.Id, addrURL, time.Since(lastSince))
+					log.Printf("[%d:%s] was offline, now online - time since=%s", t.Id, addrURL, time.Since(status.Since))
 				}
-				// Don't bother with 'up' alert if the host was down less than a minute
-				if time.Since(lastSince) > time.Duration(time.Minute) {
-					alertRequest <- &status
-				}
+				log.Printf("[%d:%s] was offline, now online -  send alert", t.Id, addrURL)
+				alertRequest <- &status
 			}
 		}
 
@@ -214,7 +210,11 @@ func alertRoutine(alertRequest <-chan *TargetStatus, config Config) {
 					select {
 					case req2 := <-alertRequest:
 						if req2.Online {
-							alert(req2, config)
+							// Don't bother with 'up' alert if the host was down less than a minute
+							if time.Since(req2.Since) > time.Duration(time.Minute) {
+								alert(req2, config)
+							}
+							req2.Since = time.Now()
 							goto done
 						} else {
 							// if another 'offline' requests comes in the meantime
