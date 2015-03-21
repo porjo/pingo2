@@ -24,15 +24,13 @@ var tpl = template.Must(
 			.offline{ background-color: #E33; color: #FFF; padding: 3px 5px; border-radius: 5px}
 			.time{ font-size: 0.8em }
 		</style>
-	
-		
 	</head>
 	<body>
 		<div id="main" style="margin: auto">
-			<h1>Pingo</h1>
+			<h1>Pingo2</h1>
 			<div id="targets" ng-controller="TargetController">
 				<p>Total number of targets : <strong>{{targets.length}}</strong></p>
-				Search: <input ng-model="q"/>
+				Search: <input ng-model="q" placeholder="filter keyword">
 				<table>
 					<tr>
 						<th ng-switch="'Target.Name' && asc">
