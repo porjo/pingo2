@@ -16,6 +16,9 @@ import (
 // minimum interval between checks. Used as default value when none set by user.
 const CheckInterval = 30
 
+// don't alert if host goes down and comes back within this time span
+const StandoffInterval = 60
+
 type Target struct {
 	// target id
 	Id int
@@ -53,6 +56,19 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 		t.Interval = CheckInterval
 	}
 
+	addrURL, err = url.Parse(t.Addr)
+	if err != nil {
+		log.Printf("[%d:-] target address %s could not be read, %s", t.Id, addrURL, err)
+		return
+	}
+
+	if config.Standoff == 0 {
+		config.Standoff = StandoffInterval
+	} else if config.Standoff <= t.Interval {
+		log.Printf("[%d:%s] Standoff %d can't be <= Interval %d, Standoff now %d\n", t.Id, addrURL, config.Standoff, t.Interval, t.Interval+1)
+		config.Standoff = t.Interval + 1
+	}
+
 	// wait a bit, to randomize check offset
 	time.Sleep(time.Duration(rand.Intn(t.Interval)) * time.Second)
 
@@ -65,12 +81,6 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 	for {
 		failed = false
 		status.ErrorMsg = ""
-
-		addrURL, err = url.Parse(t.Addr)
-		if err != nil {
-			log.Printf("target address %s could not be read, %s", t.Addr, err)
-			break
-		}
 
 		// Polling
 		switch addrURL.Scheme {
@@ -166,7 +176,6 @@ func runTarget(t Target, res chan TargetStatus, config Config) {
 				if debug {
 					log.Printf("[%d:%s] was offline, now online - time since=%s", t.Id, addrURL, time.Since(status.Since))
 				}
-				log.Printf("[%d:%s] was offline, now online -  send alert", t.Id, addrURL)
 				alertRequest <- &status
 			}
 		}
@@ -184,9 +193,7 @@ func alert(status *TargetStatus, config Config) {
 		if err != nil {
 			log.Printf("%s", err)
 		}
-		if debug {
-			log.Printf("[%d:%s] alert sent to %s", status.Target.Id, status.Target.Addr, config.Alert.ToEmail)
-		}
+		log.Printf("[%d:%s] alert sent to %s", status.Target.Id, status.Target.Addr, config.Alert.ToEmail)
 	} else {
 		if debug {
 			log.Printf("[%d:%s] alert NOT sent as no 'To:' email specified", status.Target.Id, status.Target.Addr)
@@ -196,6 +203,7 @@ func alert(status *TargetStatus, config Config) {
 }
 
 func alertRoutine(alertRequest <-chan *TargetStatus, config Config) {
+
 	for {
 		select {
 		case req := <-alertRequest:
@@ -204,15 +212,19 @@ func alertRoutine(alertRequest <-chan *TargetStatus, config Config) {
 				alert(req, config)
 			} else {
 				// Don't bother with 'down' alert
-				// if host comes back within a minute
-				timer1 := time.NewTimer(time.Minute)
+				// if host comes back within standoff time
+				timer1 := time.NewTimer(time.Duration(config.Standoff) * time.Second)
 				for {
 					select {
 					case req2 := <-alertRequest:
 						if req2.Online {
-							// Don't bother with 'up' alert if the host was down less than a minute
-							if time.Since(req2.Since) > time.Duration(time.Minute) {
+							// Don't bother with 'up' alert if the host was down less than standoff time
+							if time.Since(req2.Since) > time.Duration(config.Standoff)*time.Second {
 								alert(req2, config)
+							} else {
+								if debug {
+									log.Printf("[%d:%s] down/up alerts skipped due to standoff", req.Target.Id, req.Target.Addr)
+								}
 							}
 							req2.Since = time.Now()
 							goto done

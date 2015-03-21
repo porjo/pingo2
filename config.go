@@ -16,6 +16,9 @@ type Config struct {
 	// Alert properties
 	Alert   Alert
 	Targets []Target
+	// standoff from sending alert if host down and back again
+	// within this many seconds
+	Standoff int
 }
 
 type Alert struct {
